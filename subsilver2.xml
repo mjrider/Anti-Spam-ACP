@@ -40,7 +40,7 @@ Bug reports are accepted and, if confirmed as a bug, you will receive support fo
 <action-group>
 	<open src="styles/subsilver2/template/overall_footer.html">
 		<edit>
-			<find><![CDATA[<span class="copyright">Powered by <a href="http://www.phpbb.com/">phpBB</a> &copy; 2000, 2002, 2005, 2007 phpBB Group]]></find>
+			<find><![CDATA[<span class="copyright">{CREDIT_LINE}]]></find>
 			<action type="before-add"><![CDATA[	<br />{L_ASACP_CREDITS}]]></action>
 		</edit>
     </open>
