@@ -121,6 +121,23 @@ class antispam
 	//public static function ucp_preregister()
 
 	/**
+	 * sfs_get_data
+	 * Small helper function wrapping away the ugly part to get remote content
+	 *
+	 * @param string $ip Ip of the user
+	 * @param string $email emailadres of the user
+	 * @param string $username username of the user
+	 */
+
+	protected static function sfs_get_data ($ip,$email,$username) {
+		// http://www.stopforumspam.com/api?email=g2fsehis5e@mail.ru&username=MariFoogwoogy&f=serial
+		$url = 'api?f=json&username=' . urlencode($username) ."&email=" . urlencode($email) . "&ip=" . urlencode($ip);
+		$file = file_get_contents('http://stopforumspam.com/'. $url);
+		$sfsdata = json_decode($file,true);
+		return $sfsdata;
+	}
+
+	/**
 	* UCP Register
 	*
 	* @param array $data Data from ucp_register
@@ -176,56 +193,24 @@ class antispam
 		// Stop Forum Spam stuff
 		if (!sizeof($error) && $config['asacp_sfs_action'] > 1)
 		{
-			if (!function_exists('get_remote_file'))
+
+			$checkkeys[] = 'username';
+			$checkkeys[] = 'email';
+			$checkkeys[] = 'ip';
+
+			$data = self::sfs_get_data($user->ip,$data['email'],$data['username']);
+
+			foreach ($checkkeys as $key)
 			{
-				global $phpbb_root_path, $phpEx;
-				include($phpbb_root_path . 'includes/functions_admin.' . $phpEx);
-			}
-
-			$stop_forum_spam_urls = array(
-				'api?username=' . urlencode($data['username']),
-				'api?email=' . urlencode($data['email']),
-				//'api?ip=' . $user->ip,
-			);
-
-			foreach ($stop_forum_spam_urls as $url)
-			{
-				$errstr = $errno = '';
-				$file = get_remote_file('stopforumspam.com', '', $url, $errstr, $errno);
-
-				if ($file !== false)
-				{
-					$file = str_replace("\r\n", "\n", $file);
-					$file = explode("\n", $file);
-
-					$appears = $frequency = false;
-					foreach ($file as $line)
+				if ( $data[$key]['appears'] &&
+					$data[$key]['frequency'] >= $config['asacp_sfs_min_freq']
+				) {
+					self::$sfs_spam = true;
+					if ($config['asacp_sfs_action'])
 					{
-						if (strpos($line, '<appears>') !== false && strpos($line, '</appears>') !== false)
-						{
-							$start = strpos($line, '<appears>') + 9;
-							$end = strpos($line, '</appears>') - $start;
-							$appears = (substr($line, $start, $end) == 'yes') ? true : false;
-						}
-						else if (strpos($line, '<frequency>') !== false && strpos($line, '</frequency>') !== false)
-						{
-							$start = strpos($line, '<frequency>') + 11;
-							$end = strpos($line, '</frequency>') - $start;
-							$frequency = (int) substr($line, $start, $end);
-						}
+						self::add_log('LOG_SPAM_USER_DENIED_SFS', array($url));
 					}
-
-					if ($appears && $frequency >= $config['asacp_sfs_min_freq'])
-					{
-						self::$sfs_spam = true;
-
-						if ($config['asacp_sfs_action'])
-						{
-							self::add_log('LOG_SPAM_USER_DENIED_SFS', array($url));
-						}
-
-						break;
-					}
+					break;
 				}
 			}
 
